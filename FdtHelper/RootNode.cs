@@ -56,28 +56,27 @@ namespace DtsTools
 
 		private class OverlayItem
 		{
-			private Node _node;
 			private OverlayType _type;
 			private NodeProperty _property;
 
 			public static OverlayItem AddNode(Node node)
 			{
-				return new OverlayItem {_type = OverlayType.AddNode, _node = node};
+				return new OverlayItem {_type = OverlayType.AddNode, Node = node};
 			}
 
 			public static OverlayItem DeleteNode(Node node)
 			{
-				return new OverlayItem {_type = OverlayType.DeleteNode, _node = node};
+				return new OverlayItem {_type = OverlayType.DeleteNode, Node = node};
 			}
 
 			public static OverlayItem SetProperty(Node node, NodeProperty property)
 			{
-				return new OverlayItem {_type = OverlayType.SetProperty, _node = node, _property = property};
+				return new OverlayItem {_type = OverlayType.SetProperty, Node = node, _property = property};
 			}
 
 			public static OverlayItem DeleteProperty(Node node, NodeProperty property)
 			{
-				return new OverlayItem {_type = OverlayType.DeleteProperty, _node = node, _property = property};
+				return new OverlayItem {_type = OverlayType.DeleteProperty, Node = node, _property = property};
 			}
 
 			public string Location
@@ -88,10 +87,10 @@ namespace DtsTools
 					{
 						case OverlayType.AddNode:
 						case OverlayType.DeleteNode:
-							return _node.Location;
+							return Node.Location;
 						case OverlayType.SetProperty:
 						case OverlayType.DeleteProperty:
-							return string.IsNullOrEmpty(_node.Label) ? $"{_node.Location}|{_node.Name}" : $"&{_node.Label}";
+							return string.IsNullOrEmpty(Node.Label) ? string.IsNullOrEmpty(Node.Location) ? Node.Name : $"{Node.Location}|{Node.Name}" : $"&{Node.Label}";
 
 						default:
 							throw new ArgumentOutOfRangeException();
@@ -99,33 +98,24 @@ namespace DtsTools
 				}
 			}
 
+			public Node Node { get; private set; }
+
 			public string Dump(List<OverlayItem> others = null)
 			{
 				var hops = Location.Split('|');
-				var output = "";
-				var indent = "";
+				var output = string.Empty;
+				var indent = string.Empty;
 				for (var i = 0; i < hops.Length; i++)
 				{
-					for (var j = 0; j < i; j++)
-					{
-						indent += '\t';
-					}
-
 					output += $"{indent}{hops[i]} {{\n";
+					indent += '\t';
 				}
-
-				indent += "\t";
 
 				output += DumpBody(indent, others);
 
-				indent = indent.Remove(indent.Length - 1);
 				for (var i = 0; i < hops.Length; i++)
 				{
-					for (var j = 0; j < i; j++)
-					{
-						indent = indent.Remove(indent.Length - 1);
-					}
-
+					indent = indent.Remove(indent.Length - 1);
 					output += $"{indent}}};\n";
 				}
 
@@ -134,7 +124,7 @@ namespace DtsTools
 
 			private string DumpBody(string indent, List<OverlayItem> others = null)
 			{
-				var output = "";
+				var output = string.Empty;
 				switch (_type)
 				{
 					case OverlayType.AddNode:
@@ -153,10 +143,10 @@ namespace DtsTools
 							indent = indent.Remove(indent.Length - 1);
 							output += $"{indent}}};\n";
 						}
-						DumpNode(_node);
+						DumpNode(Node);
 						break;
 					case OverlayType.DeleteNode:
-						output += $"{indent}/delete-node/ {_node.Name};\n";
+						output += $"{indent}/delete-node/ {Node.Name};\n";
 						break;
 					case OverlayType.SetProperty:
 						output += $"{indent}{_property};\n";
@@ -185,15 +175,18 @@ namespace DtsTools
 		public string Overlay(RootNode target)
 		{
 			var overlayItems = new List<OverlayItem>();
+			var nodesToDelete = new List<OverlayItem>();
+			var nodesToAdd = new List<OverlayItem>();
 
 			foreach (var kv in _pathMap)
 			{
 				var srcNodePath = kv.Key;
 				var srcNode = kv.Value;
-
 				if (!target._pathMap.ContainsKey(srcNodePath))
 				{
-					overlayItems.Add(OverlayItem.AddNode(srcNode));
+					var item = OverlayItem.AddNode(srcNode);
+					overlayItems.Add(item);
+					nodesToAdd.Add(item);
 					continue;
 				}
 
@@ -217,7 +210,9 @@ namespace DtsTools
 
 				if (!_pathMap.ContainsKey(targetNodePath))
 				{
-					overlayItems.Add(OverlayItem.DeleteNode(targetNode));
+					var item = OverlayItem.DeleteNode(targetNode);
+					overlayItems.Add(item);
+					nodesToDelete.Add(item);
 					continue;
 				}
 
@@ -234,18 +229,26 @@ namespace DtsTools
 				}
 			}
 
+			var processedItems = new List<OverlayItem>();
+			var delayedItems = new List<OverlayItem>();
 			var dump = "";
 
 			for (var i = 0; i < overlayItems.Count; i++)
 			{
 				var item = overlayItems[i];
+				if(nodesToDelete.Any(di => item.Node.IsDescendantOf(di.Node)) || nodesToAdd.Any(di => item.Node.IsDescendantOf(di.Node))) continue;
+
 				var itemsAtSameLocation = overlayItems.Where(o => o != item && o.Location == item.Location).ToList();
 				foreach (var oi in itemsAtSameLocation)
 				{
 					overlayItems.Remove(oi);
 				}
 
+				// if(!string.IsNullOrEmpty(item._node.Label) && !processedItems.Contains())
+
 				dump += item.Dump(itemsAtSameLocation);
+				// processedItems.Add(item);
+				// processedItems.AddRange(itemsAtSameLocation);
 			}
 
 			return dump;

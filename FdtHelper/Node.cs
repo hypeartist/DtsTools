@@ -16,7 +16,7 @@ namespace DtsTools
 			if (parent == null)
 			{
 				_level = -1;
-				Path = "";
+				Path = string.Empty;
 			}
 			else
 			{
@@ -43,7 +43,7 @@ namespace DtsTools
 		{
 			get
 			{
-				var path = "";
+				var path = string.Empty;
 				var parent = Parent;
 				while (parent != null && parent.Name != "root")
 				{
@@ -56,9 +56,23 @@ namespace DtsTools
 					path = string.IsNullOrEmpty(path) ? $"{parent.Name}" : $"{parent.Name}|{path}";
 					parent = parent.Parent;
 				}
-
 				return path;
 			}
+		}
+
+		public bool IsDescendantOf(Node ancestor)
+		{
+			var parent = Parent;
+			while (parent != null && parent.Name != "root")
+			{
+				if (ancestor.Path == parent.Path)
+				{
+					return true;
+				}
+				parent = parent.Parent;
+			}
+
+			return false;
 		}
 
 		public Node AddChild(string name, string label)
@@ -95,7 +109,7 @@ namespace DtsTools
 		{
 			if (prop.Name.StartsWith("/delete-node/"))
 			{
-				var node = Root.FindNodeByPath($"{Path}|{prop.Name.Replace("/delete-node/", "")}");
+				var node = Root.FindNodeByPath($"{Path}|{prop.Name.Replace("/delete-node/", "").Trim()}");
 				node.Parent._childNodes.Remove(node);
 				Root.DeleteNode(node);
 				return;
@@ -108,19 +122,35 @@ namespace DtsTools
 			return string.IsNullOrEmpty(Label) ? Name : $"{Label}: {Name}";
 		}
 
-		public string Dump()
+		private string LabeledPath
+		{
+			get
+			{
+				var path = !string.IsNullOrEmpty(Label) ? $"&{Label}" : Name;
+				var parent = Parent;
+				while (parent != null && parent.Name != "root")
+				{
+					path = (!string.IsNullOrEmpty(parent.Label) ? $"&{parent.Label}" : parent.Name) + $"|{path}";
+					parent = parent.Parent;
+				}
+
+				return path;
+			}
+		}
+
+		public string Dump(bool printNodesPaths = true)
 		{
 			if (Parent == null)
 			{
 				return _childNodes[0].Dump();
 			}
-			var indent = "";
+			var indent = string.Empty;
 			for (var i = 0; i < _level; i++)
 			{
 				indent += '\t';
 			}
 
-			var dump = $"\n{Path}\n\n";
+			var dump = printNodesPaths ? $"\n//:   {LabeledPath}\n\n" : string.Empty;
 			dump += $"{indent}{this} {{\n";
 			var innerIndent = indent + '\t';
 

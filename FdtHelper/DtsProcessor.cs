@@ -65,32 +65,11 @@ namespace DtsTools
 			return null;
 		}
 
-		public static string Dump(string workingFolder, string[] fileNames, List<string> processedFiles)
+		public static (RootNode, List<string>) Parse(string workingFolder, string fileName)
 		{
-			DtsProcessor processor = null;
-			Node rootNode = null;
-			for (var i = 0; i < fileNames.Length; i++)
-			{
-				var fileName = fileNames[i];
-				processor = ProcessFileExt(workingFolder, fileName, rootNode, processedFiles);
-				rootNode = processor._rootNode;
-			}
-
-			return processor == null ? string.Empty : processor._rootNode.Root.Dump();
-		}
-
-		public static RootNode Dump(string workingFolder, string[] fileNames)
-		{
-			DtsProcessor processor = null;
-			Node rootNode = null;
-			for (var i = 0; i < fileNames.Length; i++)
-			{
-				var fileName = fileNames[i];
-				processor = ProcessFileExt(workingFolder, fileName, rootNode, new List<string>());
-				rootNode = processor._rootNode;
-			}
-
-			return processor?._rootNode.Root;
+			var processedFiles = new List<string>();
+			var processor = ProcessFileExt(workingFolder, fileName, null, processedFiles);
+			return (processor._rootNode.Root, processedFiles);
 		}
 
 		private static DtsProcessor ProcessFileExt(string workingFolder, string fileName, Node parent, List<string> processedFiles)
